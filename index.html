@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interactive report on Malaysian inflation 2021 to 2026, built from DOSM open data.">
+<style>:root{color-scheme:light}html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Malaysia Cost-of-Living Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column. Masthead, three headline numbers, three takeaways, then chart cards in a two-column grid (division chart spans full width). */
+:root{
+  --bg:#F3F6FA; --surface:#FFFFFF; --ink:#12202D; --muted:#586878; --line:#DCE3EB; --hover:#EDF2F8;
+  --accent:#1F4FD8; --on-accent:#FFFFFF; --prev:#9AA9BA; --warm:#B5651D;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-data:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D141C; --surface:#151E28; --ink:#E7EDF3; --muted:#94A3B3; --line:#263341; --hover:#1B2734;
+    --accent:#7AA2FF; --on-accent:#0D141C; --prev:#5F7185; --warm:#E3A24B; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D141C; --surface:#151E28; --ink:#E7EDF3; --muted:#94A3B3; --line:#263341; --hover:#1B2734;
+  --accent:#7AA2FF; --on-accent:#0D141C; --prev:#5F7185; --warm:#E3A24B; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:15px/1.55 var(--font-body);
+  padding-block:32px 64px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:1040px;margin:0 auto;display:grid;gap:32px}
+.eyebrow{font:500 12px var(--font-data);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+h1{font-size:clamp(28px,5.2vw,44px);line-height:1.08;letter-spacing:-.02em;font-weight:600;margin:0 0 14px;text-wrap:balance}
+.lede{max-width:62ch;margin:0;color:var(--muted);font-size:16.5px}
+.tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0}
+.tile .n{font:500 36px/1.1 var(--font-data);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.tile .l{font-weight:600;margin-top:6px}
+.tile .s{color:var(--muted);font-size:13px;margin-top:2px}
+.takes{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.take{border-top:1px solid var(--line);padding-top:12px;min-width:0}
+.take h2{font-size:16px;margin:0 0 6px;line-height:1.3;text-wrap:balance}
+.take p{margin:0;color:var(--muted);font-size:14.5px}
+.cards{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 18px 14px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.card.wide{grid-column:1/-1}
+.card h3{font-size:18px;line-height:1.3;margin:0;font-weight:600;text-wrap:balance}
+.sub{color:var(--muted);font-size:13.5px;margin:0}
+.note{color:var(--muted);font-size:12.5px;margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:18px;height:0;border-top:3px solid var(--accent);border-radius:2px}
+.sw.dash{border-top:3px dashed var(--prev)}
+.sw.warm{border-top-color:var(--warm)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;align-self:flex-start}
+.seg button{font:500 13px var(--font-body);padding:7px 14px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.seg button:hover:not([aria-pressed="true"]){background:var(--hover)}
+button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chart{width:100%;min-width:0}
+.chart svg{display:block;max-width:100%}
+svg .t{fill:var(--muted);font:11px var(--font-data)}
+svg .lab{fill:var(--ink);font:12.5px var(--font-body)}
+svg .val{fill:var(--ink);font:500 12px var(--font-data)}
+svg .row .bg{fill:transparent}
+svg .row:hover .bg{fill:var(--hover)}
+svg .hit .xh{opacity:0;stroke:var(--muted);stroke-dasharray:3 3}
+svg .hit:hover .xh{opacity:1}
+#tip{position:fixed;z-index:20;pointer-events:none;background:var(--ink);color:var(--bg);padding:8px 10px;border-radius:6px;font-size:12.5px;line-height:1.45;max-width:240px;font-variant-numeric:tabular-nums}
+.method{display:grid;gap:10px;color:var(--muted);font-size:13.5px;max-width:78ch}
+.method h2{font-size:16px;color:var(--ink);margin:0}
+.method p{margin:0}
+.method ul{margin:0;padding-left:18px;display:grid;gap:4px}
+a{color:var(--accent)}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px}
+summary{cursor:pointer;font-weight:600}
+.tw{overflow-x:auto;margin-top:12px}
+table{border-collapse:collapse;font:12.5px var(--font-data);font-variant-numeric:tabular-nums;min-width:100%}
+th,td{padding:6px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500}
+.tables{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">OpenDOSM · Consumer Price Index · to Sep 2026</p>
+    <h1>Malaysia Cost-of-Living Explorer</h1>
+    <p class="lede">Prices are still rising, just more slowly than a few years ago. This report follows what happened to the cost of everyday goods and services between 2021 and 2026, and where the increases landed.</p>
+  </header>
+
+  <section class="tiles" aria-label="Headline numbers">
+    <div class="tile"><div class="n">1.4%</div><div class="l">Inflation in 2025</div><div class="s">Down from 3.3% in 2022</div></div>
+    <div class="tile"><div class="n">+9.3%</div><div class="l">Basket cost vs 2021</div><div class="s">Calculated from the DOSM price index: 123.1 in 2021, 134.6 in 2025</div></div>
+    <div class="tile"><div class="n">1.8%</div><div class="l">September 2026</div><div class="s">Year on year, after 1.9% in August</div></div>
+  </section>
+
+  <section class="takes" aria-label="Key takeaways">
+    <div class="take"><h2>Inflation has cooled every year since 2022</h2><p>The annual rate fell from 3.3% to 2.5%, then 1.8%, then 1.4%. Monthly readings in 2026 have stayed near 1.8% to 1.9%.</p></div>
+    <div class="take"><h2>Slower does not mean cheaper</h2><p>Prices kept climbing each year, so the same basket of goods now costs about 9% more than it did in 2021.</p></div>
+    <div class="take"><h2>Services and finance now lead</h2><p>In 2025 personal care, insurance and restaurants rose fastest. Communication was the one big category getting cheaper, down 4.3%.</p></div>
+  </section>
+
+  <section class="cards">
+    <article class="card">
+      <h3>Inflation is slowing, and core inflation is close behind</h3>
+      <p class="sub">Annual change in the consumer price index, %</p>
+      <div class="legend"><span><i class="sw"></i>Headline</span><span><i class="sw dash"></i>Core (excludes volatile and administered prices)</span></div>
+      <div class="chart" id="c-head"></div>
+      <p class="note">Core inflation for 2025 was not in the DOSM pages used here, so that line stops at 2024.</p>
+    </article>
+
+    <article class="card">
+      <h3>A basket that cost RM100 in 2021 now costs about RM109</h3>
+      <p class="sub">How much higher prices are than in 2021, %</p>
+      <div class="chart" id="c-cum"></div>
+      <p class="note">Calculated from DOSM annual price index values (2010 = 100).</p>
+    </article>
+
+    <article class="card wide">
+      <h3>Where the increases landed</h3>
+      <p class="sub">Annual inflation by spending category. Switch between years or see the change.</p>
+      <div class="seg" role="group" aria-label="Choose view">
+        <button type="button" id="m-2025" aria-pressed="true">2025</button>
+        <button type="button" id="m-2024" aria-pressed="false">2024</button>
+        <button type="button" id="m-chg" aria-pressed="false">Change, 2024 to 2025</button>
+      </div>
+      <p class="sub" id="div-note" aria-live="polite" style="color:var(--ink)"></p>
+      <div class="chart" id="c-div"></div>
+      <p class="note">Hover or tap a bar for exact values. The change view is in percentage points.</p>
+    </article>
+
+    <article class="card">
+      <h3>City prices rose faster than rural ones, and the gap widened</h3>
+      <p class="sub">Annual inflation, urban and rural areas, %</p>
+      <div class="legend"><span><i class="sw"></i>Urban</span><span><i class="sw warm"></i>Rural</span></div>
+      <div class="chart" id="c-ur"></div>
+      <p class="note">2021 is missing because the DOSM pages used here do not give it.</p>
+    </article>
+
+    <article class="card">
+      <h3>Johor and Selangor ran above the national rate in 2025</h3>
+      <p class="sub">Annual inflation by state, %</p>
+      <div class="chart" id="c-st"></div>
+      <p class="note">Selected states named in DOSM's 2025 analysis. Blue bars are above the national rate.</p>
+    </article>
+
+    <article class="card wide">
+      <h3>Malaysia sits in the middle of ASEAN</h3>
+      <p class="sub">Annual inflation in 2025, %</p>
+      <div class="chart" id="c-as"></div>
+      <p class="note">Countries listed in DOSM's 2025 ASEAN comparison.</p>
+    </article>
+  </section>
+
+  <section class="method">
+    <h2>About this report</h2>
+    <p>Figures come from the Department of Statistics Malaysia (DOSM) annual consumer price index analyses, published as open data on OpenDOSM under a CC BY 4.0 licence. Values were keyed in from those releases and the index changes were checked against the stated percentages.</p>
+    <ul>
+      <li>Category figures use DOSM's 13-division classification, which applies from 2024. Earlier years used a 12-division version with different names, so categories are compared for 2024 and 2025 only.</li>
+      <li>The 2026 monthly readings are year-on-year rates reported in the press and are not directly comparable with annual averages.</li>
+      <li>To refresh the numbers, pull the <code>cpi_annual_inflation</code> dataset from OpenDOSM.</li>
+    </ul>
+    <p>Sources:
+      <a href="https://www.dosm.gov.my/portal-main/release-content/analysis-of-annual-consumer-price-index-malaysia-2025" target="_blank" rel="noopener">DOSM annual CPI 2025</a>,
+      <a href="https://www.dosm.gov.my/portal-main/release-content/analysis-of-annual-consumer-price-index-malaysia-2024" target="_blank" rel="noopener">2024</a>,
+      <a href="https://www.dosm.gov.my/portal-main/release-content/analysis-of-annual-consumer-price-index-malaysia-2023" target="_blank" rel="noopener">2023</a>,
+      <a href="https://www.dosm.gov.my/portal-main/release-content/d5e9f77d-8b80-11ed-96a6-1866daa77ef9" target="_blank" rel="noopener">2022</a>,
+      <a href="https://open.dosm.gov.my/data-catalogue/cpi_annual_inflation" target="_blank" rel="noopener">OpenDOSM catalogue</a>,
+      <a href="https://www.thestar.com.my/business/business-news/2026/10/19/september-inflation-eases-slightly-to-18-on-as-utilities-cost-moderates" target="_blank" rel="noopener">The Star, September 2026</a>,
+      <a href="https://www.malaymail.com/news/money/2026/09/18/dosm-malaysias-august-inflation-edges-up-to-19pc-on-higher-transport-services-costs/235641" target="_blank" rel="noopener">Malay Mail, August 2026</a>.
+    </p>
+  </section>
+
+  <details>
+    <summary>View the data as tables</summary>
+    <div class="tables">
+      <div class="tw" id="tb1"></div>
+      <div class="tw" id="tb2"></div>
+    </div>
+  </details>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+const YEARS=[2021,2022,2023,2024,2025];
+const HEAD=[2.5,3.3,2.5,1.8,1.4], CORE=[0.7,3.0,3.0,1.8,null];
+const IDX=[123.1,127.2,130.4,132.8,134.6];
+const URB=[3.6,2.6,1.8,1.5], RUR=[2.6,2.1,1.7,1.0];
+const DIV=[
+ {n:'Food & beverages',l:'Food & beverages',a:2.0,b:2.1},
+ {n:'Alcoholic beverages & tobacco',l:'Alcohol & tobacco',a:0.7,b:0.9},
+ {n:'Clothing & footwear',l:'Clothing & footwear',a:-0.3,b:-0.2},
+ {n:'Housing, water, electricity, gas & other fuels',l:'Housing & utilities',a:3.0,b:1.6},
+ {n:'Furnishings, household equipment & routine maintenance',l:'Furnishings & household',a:0.7,b:0.2},
+ {n:'Health',l:'Health',a:1.8,b:1.2},
+ {n:'Transport',l:'Transport',a:1.0,b:0.4},
+ {n:'Information & communication',l:'Information & communication',a:-1.5,b:-4.3},
+ {n:'Recreation, sports & culture',l:'Recreation & culture',a:1.8,b:1.1},
+ {n:'Education',l:'Education',a:1.5,b:2.3},
+ {n:'Restaurants & accommodation services',l:'Restaurants & accommodation',a:3.1,b:3.2},
+ {n:'Insurance & financial services',l:'Insurance & finance',a:0.3,b:3.4},
+ {n:'Personal care, social protection & miscellaneous',l:'Personal care & other',a:3.0,b:4.4}
+];
+const STATES=[['Johor',2.0],['Selangor',1.7],['Negeri Sembilan',1.7],['Melaka',1.5],['Malaysia',1.4],['Kelantan',0.3]];
+const ASEAN=[['Lao PDR',7.7],['Viet Nam',3.3],['Cambodia',2.5],['Indonesia',1.9],['Philippines',1.7],['Malaysia',1.4],['Singapore',0.9],['Timor-Leste',0.5],['Thailand',-0.1],['Brunei',-0.3]];
+
+const MINUS='−';
+const f1=v=>(v<0?MINUS:'')+Math.abs(v).toFixed(1);
+const pct=v=>f1(v)+'%';
+const sgn=v=>(v>0?'+':v<0?MINUS:'')+Math.abs(v).toFixed(1);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const r1=v=>Math.round(v*10)/10;
+
+function lineChart(el,o){
+  const w=Math.floor(el.clientWidth),H=o.h||240,m={l:32,r:o.end?40:14,t:12,b:28},n=o.years.length;
+  const iw=w-m.l-m.r-24;
+  const X=i=>m.l+12+i*(iw/(n-1));
+  const Y=v=>m.t+(1-(v-o.min)/(o.max-o.min))*(H-m.t-m.b);
+  let s=`<svg width="${w}" height="${H}" role="img" aria-label="${esc(o.label)}">`;
+  for(let t=o.min;t<=o.max+1e-9;t+=o.step){
+    const y=Y(t);
+    s+=`<line x1="${m.l}" x2="${w-m.r}" y1="${y}" y2="${y}" style="stroke:var(--line)"/>`;
+    s+=`<text class="t" x="${m.l-6}" y="${y+4}" text-anchor="end">${t}%</text>`;
+  }
+  o.years.forEach((yr,i)=>{s+=`<text class="t" x="${X(i)}" y="${H-8}" text-anchor="middle">${yr}</text>`});
+  o.series.forEach(se=>{
+    let d='',pen=false;
+    se.vals.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);pen=true});
+    s+=`<path d="${d}" fill="none" style="stroke:var(--${se.c})" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"${se.dash?' stroke-dasharray="5 4"':''}/>`;
+    se.vals.forEach((v,i)=>{
+      if(v==null)return;
+      const fill=se.dash?'var(--surface)':`var(--${se.c})`;
+      const stroke=se.dash?`var(--${se.c})`:'var(--surface)';
+      s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="4.5" style="fill:${fill};stroke:${stroke}" stroke-width="2"/>`;
+      if(o.end&&i===n-1)s+=`<text class="val" x="${X(i)+10}" y="${Y(v)+4}">${pct(v)}</text>`;
+    });
+  });
+  const bw=iw/(n-1);
+  o.years.forEach((yr,i)=>{
+    let tip=`<b>${yr}</b>`;
+    o.series.forEach(se=>{tip+=`<br>${se.name}: ${se.vals[i]==null?'not available':pct(se.vals[i])}`});
+    s+=`<g class="hit" data-tip="${esc(tip)}"><rect x="${X(i)-bw/2}" y="${m.t}" width="${bw}" height="${H-m.t-m.b}" fill="transparent"/><line class="xh" x1="${X(i)}" x2="${X(i)}" y1="${m.t}" y2="${H-m.b}"/></g>`;
+  });
+  el.innerHTML=s+'</svg>';
+}
+
+function hbar(el,o){
+  const w=Math.floor(el.clientWidth),narrow=w<520;
+  const rows=o.rows,rowH=narrow?40:27;
+  const labW=narrow?0:Math.min(190,Math.round(w*.36));
+  const lo=Math.min(0,...rows.map(r=>r.v)),hi=Math.max(0,...rows.map(r=>r.v));
+  const x0=(narrow?4:labW+8)+(lo<0?34:0),x1=w-48;
+  const X=v=>x0+(v-lo)/(hi-lo)*(x1-x0),z=X(0);
+  let s=`<svg width="${w}" height="${rows.length*rowH+6}" role="img" aria-label="${esc(o.label)}">`;
+  rows.forEach((r,i)=>{
+    const y=i*rowH+3,bh=narrow?12:15,by=narrow?y+19:y+(rowH-bh)/2;
+    s+=`<g class="row" data-tip="${esc(r.tip)}"><rect class="bg" x="0" y="${y}" width="${w}" height="${rowH-2}" rx="4"/>`;
+    s+=narrow?`<text class="lab" x="4" y="${y+13}">${esc(r.l)}</text>`:`<text class="lab" x="6" y="${by+bh/2+4.5}">${esc(r.l)}</text>`;
+    const xe=X(r.v),xa=Math.min(z,xe),bw=Math.max(1.5,Math.abs(xe-z));
+    s+=`<rect x="${xa}" y="${by}" width="${bw}" height="${bh}" rx="3" style="fill:var(--${r.c||'accent'})"/>`;
+    const tx=r.v>=0?xe+6:xe-6,anc=r.v>=0?'start':'end';
+    s+=`<text class="val" x="${tx}" y="${by+bh/2+4}" text-anchor="${anc}">${o.fmt(r.v)}</text></g>`;
+  });
+  if(lo<0)s+=`<line x1="${z}" x2="${z}" y1="0" y2="${rows.length*rowH+6}" style="stroke:var(--muted)" pointer-events="none"/>`;
+  el.innerHTML=s+'</svg>';
+}
+
+const charts=[];
+function mount(id,fn){
+  const el=document.getElementById(id),c={el,w:0};
+  const draw=()=>{const w=Math.floor(el.clientWidth);if(w&&w!==c.w){c.w=w;fn(el)}};
+  c.redraw=()=>{c.w=0;draw()};
+  new ResizeObserver(draw).observe(el);
+  draw();charts.push(c);return c;
+}
+
+mount('c-head',el=>lineChart(el,{label:'Headline and core inflation, 2021 to 2025',years:YEARS,min:0,max:4,step:1,end:true,
+  series:[{name:'Core',vals:CORE,c:'prev',dash:true},{name:'Headline',vals:HEAD,c:'accent'}]}));
+
+mount('c-cum',el=>hbar(el,{label:'Cumulative price rise since 2021',fmt:v=>v===0?'0%':'+'+pct(v),
+  rows:YEARS.map((yr,i)=>{const v=r1((IDX[i]/IDX[0]-1)*100);
+    return {l:yr===2021?'2021 (base)':String(yr),v,c:'accent',tip:`<b>${yr}</b><br>Price index: ${IDX[i].toFixed(1)}<br>${i?sgn(v)+'% vs 2021':'Base year'}`}})}));
+
+let mode='2025';
+const NOTES={
+  '2025':'Personal care, insurance and restaurants rose fastest in 2025. Communication prices fell 4.3%.',
+  '2024':'Restaurants, housing and personal care led in 2024, all near 3%.',
+  'chg':'Insurance & finance jumped 3.1 points from 2024. Housing eased 1.4 points and communication fell a further 2.8 points.'
+};
+const divChart=mount('c-div',el=>{
+  const rows=DIV.map(d=>{
+    const chg=r1(d.b-d.a);
+    const v=mode==='2025'?d.b:mode==='2024'?d.a:chg;
+    return {l:d.l,v,c:(mode==='chg'&&v<0)?'prev':'accent',
+      tip:`<b>${esc(d.n)}</b><br>2025: ${pct(d.b)}<br>2024: ${pct(d.a)}<br>Change: ${sgn(chg)} pp`};
+  }).sort((p,q)=>q.v-p.v);
+  hbar(el,{label:'Inflation by spending category',rows,fmt:mode==='chg'?(v=>sgn(v)+' pp'):pct});
+});
+function setMode(m){
+  mode=m;
+  [['2025','m-2025'],['2024','m-2024'],['chg','m-chg']].forEach(([k,id])=>document.getElementById(id).setAttribute('aria-pressed',String(k===m)));
+  document.getElementById('div-note').textContent=NOTES[m];
+  divChart.redraw();
+}
+document.getElementById('m-2025').onclick=()=>setMode('2025');
+document.getElementById('m-2024').onclick=()=>setMode('2024');
+document.getElementById('m-chg').onclick=()=>setMode('chg');
+document.getElementById('div-note').textContent=NOTES['2025'];
+
+mount('c-ur',el=>lineChart(el,{label:'Urban and rural inflation, 2022 to 2025',years:YEARS.slice(1),min:0,max:4,step:1,end:true,
+  series:[{name:'Rural',vals:RUR,c:'warm'},{name:'Urban',vals:URB,c:'accent'}]}));
+
+mount('c-st',el=>hbar(el,{label:'Inflation by state, 2025',fmt:pct,
+  rows:STATES.map(([n,v])=>({l:n==='Malaysia'?'Malaysia (national)':n,v,c:n==='Malaysia'?'ink':v>1.4?'accent':'prev',
+    tip:`<b>${n}</b><br>${pct(v)} in 2025`}))}));
+
+mount('c-as',el=>hbar(el,{label:'ASEAN inflation, 2025',fmt:pct,
+  rows:ASEAN.map(([n,v])=>({l:n,v,c:n==='Malaysia'?'accent':'prev',tip:`<b>${n}</b><br>${pct(v)} in 2025`}))}));
+
+/* tooltip */
+const tip=document.getElementById('tip');
+function showTip(e){
+  const t=e.target.closest&&e.target.closest('[data-tip]');
+  if(!t){tip.hidden=true;return}
+  tip.innerHTML=t.getAttribute('data-tip');tip.hidden=false;
+  const r=tip.getBoundingClientRect(),pad=14;
+  let x=e.clientX+pad,y=e.clientY+pad;
+  if(x+r.width>innerWidth-8)x=e.clientX-r.width-pad;
+  if(y+r.height>innerHeight-8)y=e.clientY-r.height-pad;
+  tip.style.left=Math.max(8,x)+'px';tip.style.top=Math.max(8,y)+'px';
+}
+document.addEventListener('pointermove',showTip);
+document.addEventListener('pointerdown',showTip);
+document.addEventListener('pointerout',e=>{if(!e.relatedTarget)tip.hidden=true});
+
+/* data tables */
+function table(head,rows){
+  return '<table><thead><tr>'+head.map(h=>`<th>${h}</th>`).join('')+'</tr></thead><tbody>'+
+    rows.map(r=>'<tr>'+r.map(c=>`<td>${c}</td>`).join('')+'</tr>').join('')+'</tbody></table>';
+}
+const cell=v=>v==null?'–':f1(v);
+document.getElementById('tb1').innerHTML=table(['Year','Headline %','Core %','Urban %','Rural %','Index'],
+  YEARS.map((y,i)=>[y,cell(HEAD[i]),cell(CORE[i]),cell(i?URB[i-1]:null),cell(i?RUR[i-1]:null),IDX[i].toFixed(1)]));
+document.getElementById('tb2').innerHTML=table(['Category','2024 %','2025 %','Change pp'],
+  DIV.map(d=>[d.n,f1(d.a),f1(d.b),sgn(r1(d.b-d.a))]));
+</script>
+</body>
+</html>
